@@ -88,11 +88,30 @@ jobs:
 
       - name: Build release APK
         run: |
+          set -o pipefail
           flutter build apk --release \
             --target-platform android-arm64 \
-            --no-pub
+            --no-pub 2>&1 | tee build.log
           cp build/app/outputs/flutter-apk/app-release.apk \
             "Igallta-VPN-arm64-v8a.apk"
+
+      - name: Publish build log
+        if: always()
+        run: |
+          if [ -f build.log ]; then
+            echo "## Build log tail" >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 250 build.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
 
       - name: Verify signature
         run: |
