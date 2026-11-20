@@ -113,18 +113,12 @@ jobs:
           path: build.log
           if-no-files-found: ignore
 
-      - name: Commit failure log to repository
+      - name: Publish failure log
         if: failure()
-        run: |
-          if [ ! -f build.log ]; then
-            echo "No build.log to commit."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f build.log
-          git commit -m "ci: record build failure log [skip ci]" || true
-          git push
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build.log
+          tag_name: ${{ github.ref_name }}
 
       - name: Verify signature
         run: |
