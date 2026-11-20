@@ -1,0 +1,114 @@
+name: Build Igallta VPN APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.abi }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: android-arm64
+          - abi: x86_64
+            target: android-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.6"
+          cache: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache: true
+          cache-dependency-path: core/go.sum
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install 1.99.0 --profile minimal \
+            --target aarch64-linux-android,x86_64-linux-android
+          rustup default 1.99.0
+          rustc --version
+          cargo --version
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install \
+            "platforms;android-37" \
+            "build-tools;37.0.0" \
+            "ndk;28.2.13676358"
+          yes | sdkmanager --licenses > /dev/null
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang libclang-dev cmake ninja-build pkg-config libssl-dev
+
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+
+      - name: Write signing properties
+        run: |
+          cat > android/local.properties <<EOF
+          sdk.dir=${ANDROID_SDK_ROOT}
+          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Require signing material
+        run: |
+          if [ ! -s android/app/keystore.jks ]; then
+            echo "::error::Add ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD repository secrets."
+            exit 1
+          fi
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build release APK
+        run: |
+          flutter build apk --release \
+            --target-platform ${{ matrix.target }} \
+            --no-pub
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            "Igallta-VPN-${{ matrix.abi }}.apk"
+
+      - name: Verify signature
+        run: |
+          apksigner verify --print-certs "Igallta-VPN-${{ matrix.abi }}.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Igallta-VPN-${{ matrix.abi }}
+          path: Igallta-VPN-${{ matrix.abi }}.apk
+          if-no-files-found: error
