@@ -750,7 +750,7 @@ packages:
   launch_at_startup:
     dependency: "direct main"
     description:
-      path: "../launch_at_startup_src/launch_at_startup-e930ce65c5804343103447e01d39fccabedc8681"
+      path: "plugins/launch_at_startup"
       relative: true
     source: path
     version: "0.5.1"
