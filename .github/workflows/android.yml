@@ -113,6 +113,19 @@ jobs:
           path: build.log
           if-no-files-found: ignore
 
+      - name: Commit failure log to repository
+        if: failure()
+        run: |
+          if [ ! -f build.log ]; then
+            echo "No build.log to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f build.log
+          git commit -m "ci: record build failure log [skip ci]" || true
+          git push
+
       - name: Verify signature
         run: |
           apksigner verify --print-certs "Igallta-VPN-arm64-v8a.apk"
