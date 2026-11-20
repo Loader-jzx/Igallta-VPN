@@ -77,8 +77,10 @@ android {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
+                // CI without repository secrets still produces a release-mode
+                // APK under the production applicationId. It is re-signed with
+                // the Igallta release key after download.
                 signingConfig = signingConfigs.getByName("debug")
-                applicationIdSuffix = ".dev"
             }
 
             proguardFiles(
